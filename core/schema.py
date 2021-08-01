@@ -2,6 +2,8 @@ import graphene
 
 from graphql_auth.schema import UserQuery, MeQuery
 from graphql_auth import mutations
+from assessment.schema import Query as AssessmentQuery
+from assessment.schema import Mutation as AssessmentMutation
 
 
 class AuthMutation(graphene.ObjectType):
@@ -11,12 +13,7 @@ class AuthMutation(graphene.ObjectType):
     send_password_reset_email = mutations.SendPasswordResetEmail.Field()
     password_reset = mutations.PasswordReset.Field()
     password_change = mutations.PasswordChange.Field()
-    archive_account = mutations.ArchiveAccount.Field()
-    delete_account = mutations.DeleteAccount.Field()
     update_account = mutations.UpdateAccount.Field()
-    send_secondary_email_activation = mutations.SendSecondaryEmailActivation.Field()
-    verify_secondary_email = mutations.VerifySecondaryEmail.Field()
-    swap_emails = mutations.SwapEmails.Field()
 
     # django-graphql-jwt inheritances
     token_auth = mutations.ObtainJSONWebToken.Field()
@@ -25,11 +22,11 @@ class AuthMutation(graphene.ObjectType):
     revoke_token = mutations.RevokeToken.Field()
 
 
-class Query(UserQuery, MeQuery, graphene.ObjectType):
+class Query(UserQuery, MeQuery, graphene.ObjectType, AssessmentQuery):
     pass
 
 
-class Mutation(AuthMutation, graphene.ObjectType):
+class Mutation(AuthMutation, graphene.ObjectType, AssessmentMutation):
     pass
 
 

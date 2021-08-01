@@ -43,6 +43,7 @@ INSTALLED_APPS = [
     'graphql_jwt.refresh_token.apps.RefreshTokenConfig',
     'django_filters',
     'users',
+    'assessment'
 ]
 
 AUTH_USER_MODEL = 'users.CustomUser'
