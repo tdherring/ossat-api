@@ -11,7 +11,18 @@ from .simulator.memory.contiguous.first_fit import FirstFit
 from .simulator.memory.contiguous.best_fit import BestFit
 from .simulator.memory.contiguous.worst_fit import WorstFit
 import random
-import json
+
+
+class KMeansData(models.Model):
+    id = models.AutoField(primary_key=True)
+    user = models.ForeignKey(CustomUser, on_delete=models.CASCADE)
+    output_centroids = models.JSONField()
+    closest_centroids = models.JSONField()
+
+
+class PerformanceData(models.Model):
+    id = models.AutoField(primary_key=True)
+    per_question_variant_score = models.JSONField()
 
 
 class Assessment(models.Model):
@@ -30,12 +41,13 @@ class Assessment(models.Model):
     variant = models.CharField(max_length=100, default="generated", choices=VARIANT_CHOICES)
     submitted = models.BooleanField(default=False)
     score = models.IntegerField(default=None, blank=True, null=True)
+    performance_data = models.OneToOneField(PerformanceData, on_delete=models.CASCADE, default=None, blank=True, null=True)
 
     """
     Generates the general assessments for the user when their account is verified successfully.
     """
     @receiver(user_verified)
-    def generate_general_assessmente(sender, user, **kwargs):
+    def generate_assessments(sender, user, **kwargs):
         VARIANT_MAPPINGS = {
             "CPU": {
                 "FCFS": FCFS(),
@@ -53,27 +65,30 @@ class Assessment(models.Model):
 
         print(user.get_username(), "verified account! Generating assessments...")
 
+        initial_assessment = Assessment(user=user, variant="Initial Assessment", submitted=False, score=None)
+        initial_assessment.save()
+
+        # Generate general assessments
         for variant_tuple in Assessment.VARIANT_CHOICES[2:]:
             print(variant_tuple[0])
 
             split_tuple = variant_tuple[0].split(" ")
-
             variant_name = " ".join(split_tuple[0:len(split_tuple) - 1])
             difficulty = split_tuple[len(split_tuple) - 1]
+
+            cpu_num_processes_lo_hi = [3, 5] if difficulty == "I" else [5, 7] if difficulty == "II" else [7, 9]
+            cpu_max_burst_time = 5 if difficulty == "I" else 9 if difficulty == "II" else 13
+            cpu_max_arrival_time = 10 if difficulty == "I" else 15 if difficulty == "II" else 20
+            cpu_max_priority = 6 if difficulty == "I" else 8 if difficulty == "II" else 10
+            cpu_max_time_quantum = 4 if difficulty == "I" else 7 if difficulty == "II" else 9
+
+            mem_process_block_size_lo_hi = [50, 200] if difficulty == "I" else [50, 500] if difficulty == "II" else [50, 800]
+            mem_num_blocks_lo_hi = [2, 5] if difficulty == "I" else [4, 7] if difficulty == "II" else [5, 9]
 
             assessment = Assessment(user=user, variant=variant_tuple[0], submitted=False, score=None)
             assessment.save()
 
-            for question_num in range(10):
-                cpu_num_processes_lo_hi = [3, 5] if difficulty == "I" else [5, 7] if difficulty == "II" else [7, 9]
-                cpu_max_burst_time = 5 if difficulty == "I" else 9 if difficulty == "II" else 13
-                cpu_max_arrival_time = 10 if difficulty == "I" else 15 if difficulty == "II" else 20
-                cpu_max_priority = 6 if difficulty == "I" else 8 if difficulty == "II" else 10
-                cpu_max_time_quantum = 4 if difficulty == "I" else 7 if difficulty == "II" else 9
-
-                mem_process_block_size_lo_hi = [50, 200] if difficulty == "I" else [50, 500] if difficulty == "II" else [50, 800]
-                mem_num_blocks_lo_hi = [2, 5] if difficulty == "I" else [4, 7] if difficulty == "II" else [5, 9]
-
+            for question_num in range(11):
                 for process_num in range(random.randint(cpu_num_processes_lo_hi[0], cpu_num_processes_lo_hi[1])):
                     if variant_name in VARIANT_MAPPINGS["CPU"]:
                         variant = VARIANT_MAPPINGS["CPU"][variant_name]
@@ -132,7 +147,8 @@ class Assessment(models.Model):
 
                     random.shuffle(generated_answers)
 
-                    question_text = "Using the " + str(variant_name) + " scheduling algorithm, and based on the processes below, which one is executing at time delta " + str(answer_time_delta) + "?"
+                    question_text = "Using the " + str(variant_name) + \
+                        " scheduling algorithm, and based on the processes below, which one is executing at time delta " + str(answer_time_delta) + "?"
 
                 else:
                     variant.allocate_processes()
@@ -173,11 +189,20 @@ class Assessment(models.Model):
                                 "size": block.get_size()}
                                for block in blocks] if variant_name in VARIANT_MAPPINGS["Memory"] else None
 
-                question = Question(assessment=assessment, question_text=question_text, correct_answer=answer, selected_answer=None, processes=processArray, blocks=blocksArray)
-                question.save()
+                if question_num == 10:
+                    # Initial Assessment
+                    question_initial = Question(assessment=initial_assessment, question_text=question_text, correct_answer=answer, selected_answer=None, processes=processArray, blocks=blocksArray)
+                    question_initial.save()
 
-                answer = Answer(question=question, answers=generated_answers)
-                answer.save()
+                    answer_initial = Answer(question=question_initial, answers=generated_answers)
+                    answer_initial.save()
+                else:
+                    # General Assessment
+                    question = Question(assessment=assessment, question_text=question_text, correct_answer=answer, selected_answer=None, processes=processArray, blocks=blocksArray)
+                    question.save()
+
+                    answer = Answer(question=question, answers=generated_answers)
+                    answer.save()
 
                 VARIANT_MAPPINGS = {
                     "CPU": {
@@ -193,6 +218,16 @@ class Assessment(models.Model):
                         "Worst Fit": WorstFit()
                     }
                 }
+
+        # Change order of questions to be random for initial assessment
+        for question_initial in Question.objects.filter(assessment=initial_assessment).order_by("?"):
+            answers_initial = Answer.objects.get(question=question_initial)
+
+            question_initial.delete()
+            answers_initial.delete()
+
+            question_initial.save()
+            Answer(question=question_initial, answers=answers_initial.answers).save()
 
         print("Successfully generated assessments for", user.get_username() + "!")
 
