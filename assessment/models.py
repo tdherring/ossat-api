@@ -38,7 +38,7 @@ class Assessment(models.Model):
 
     id = models.AutoField(primary_key=True)
     user = models.ForeignKey(CustomUser, on_delete=models.CASCADE)
-    variant = models.CharField(max_length=100, default="generated", choices=VARIANT_CHOICES)
+    variant = models.CharField(max_length=100, choices=VARIANT_CHOICES)
     submitted = models.BooleanField(default=False)
     score = models.IntegerField(default=None, blank=True, null=True)
     performance_data = models.OneToOneField(PerformanceData, on_delete=models.CASCADE, default=None, blank=True, null=True)
@@ -62,6 +62,9 @@ class Assessment(models.Model):
                 "Worst Fit": WorstFit()
             }
         }
+
+        # Remove all existing assessment objects for this user (regenerate if existing).
+        Assessment.objects.filter(user=user).delete()
 
         print(user.get_username(), "verified account! Generating assessments...")
 
@@ -230,6 +233,7 @@ class Assessment(models.Model):
             Answer(question=question_initial, answers=answers_initial.answers).save()
 
         print("Successfully generated assessments for", user.get_username() + "!")
+        return True
 
 
 class Question(models.Model):
@@ -239,7 +243,7 @@ class Question(models.Model):
     processes = models.JSONField()
     blocks = models.JSONField(blank=True, null=True)
     selected_answer = models.JSONField(blank=True, null=True)
-    correct_answer = models.JSONField()
+    correct_answer = models.JSONField(blank=True, null=True)
 
 
 class Answer(models.Model):

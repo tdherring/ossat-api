@@ -14,8 +14,8 @@ class CPUScheduler:
     def create_process(self, name, arrival_time, burst_time, priority=None):
         if len([process for process in self.job_queue if process.name == name]) > 0:
             print(
-                "You can't have two processes with the same ID. Skipping (" + name + ", " + arrival_time + ", " + burst_time + ", " +
-                ", " if priority is None else priority + ") and continuing silently."
+                "You can't have two processes with the same ID. Skipping (" + name + ", " + str(arrival_time) + ", " + str(burst_time) +
+                ", " if priority is None else ", " + priority + ") and continuing silently."
             )
             return
 
