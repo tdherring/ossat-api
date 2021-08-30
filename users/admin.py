@@ -12,7 +12,7 @@ def generate_assessments(modeladmin, request, queryset):
 
 
 class GenerateAssessmentAdmin(admin.ModelAdmin):
-    list_display = ("username", "first_name", "last_name", "is_staff", "is_superuser", "is_org_manager")
+    list_display = ("username", "first_name", "last_name", "is_staff", "is_superuser", "is_org_creator")
     actions = [generate_assessments]
 
 

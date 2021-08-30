@@ -2,8 +2,9 @@ import graphene
 import random
 from graphene_django.types import DjangoObjectType
 from numpy.core.fromnumeric import var
-from .models import Assessment, Question, Answer, PerformanceData, KMeansData
+from .models import Assessment, Question, Answer, PerformanceData, KMeansData, Answer
 from users.models import CustomUser
+from organisations.models import Organisation
 from graphql_jwt.utils import get_payload as verify_token
 from statistics import mean
 from pprint import pprint
@@ -39,8 +40,18 @@ class Utils:
     @staticmethod
     def authenticated_and_permitted(token, username):
         verify_payload = verify_token(token)
+
         # User has permission? (They are the user making the request or are Staff).
-        if (verify_payload["username"] == username or CustomUser.objects.get(username=verify_payload[username], is_staff=True)):
+        accessing_self = verify_payload["username"] == username
+        user_staff = CustomUser.objects.get(username=verify_payload["username"]).is_staff
+
+        user_owner = CustomUser.objects.get(username=username).id in Organisation.objects.filter(
+            owner=CustomUser.objects.get(username=verify_payload["username"])).values_list("members", flat=True)
+
+        user_manager = CustomUser.objects.get(username=verify_payload["username"]).id in Organisation.objects.filter(
+            managers=CustomUser.objects.get(username=verify_payload["username"])).values_list("managers", flat=True)
+
+        if (accessing_self or user_staff or user_owner or user_manager):
             return True
         return False
 
@@ -51,6 +62,7 @@ class Query():
 
     def resolve_get_assessments(self, info, username, token, variant=None):
         if Utils.authenticated_and_permitted(token, username):
+
             return Assessment.objects.filter(user=CustomUser.objects.get(username=username), variant=variant) if variant else Assessment.objects.filter(user=CustomUser.objects.get(username=username))
 
     def resolve_get_questions(self, info, username, token, assessment_id):
@@ -75,9 +87,9 @@ class SetQuestionAnswerMutation(graphene.Mutation):
 
     question = graphene.Field(QuestionType)
 
-    @classmethod
+    @ classmethod
     def mutate(cls, root, info, id, answer, username, token):
-        if Utils.authenticated_and_permitted(token, username):
+        if Utils.authenticated_and_permitted(token, username) and username == Question.objects.get(id=id).assessment.user.username:
             question = Question.objects.get(id=id)
             # Only allow modification if quiz not submitted.
             if not question.assessment.submitted:
@@ -95,13 +107,11 @@ class SubmitAssessmentMutation(graphene.Mutation):
 
     assessment = graphene.Field(AssessmentType)
 
-    @classmethod
+    @ classmethod
     def mutate(cls, root, info, id, username, token):
         if Utils.authenticated_and_permitted(token, username):
             assessment = Assessment.objects.get(id=id)
             # Only allow modification if quiz not submitted.
-
-            #! DISABLED FOR TESTING
 
             assessment.submitted = True
             assessment.score = len([question for question in Question.objects.filter(assessment=assessment) if question.selected_answer == question.correct_answer])
@@ -289,14 +299,14 @@ class SubmitAssessmentMutation(graphene.Mutation):
                                     if len(job_queue) <= 5:
                                         generated_answers = [{"name": process.get_name(),
                                                               "arrival_time": process.get_arrival_time(),
-                                                              "burst_time": process.get_burst_time(),
+                                                             "burst_time": process.get_burst_time(),
                                                               "priority": (process.get_priority() if variant_name == "Priority" else None)}
                                                              for process in job_queue]
                                     else:
                                         generated_answers = random.sample(job_queue, 4)
                                         generated_answers = [{"name": answer.get_name(),
                                                               "arrival_time": answer.get_arrival_time(),
-                                                              "burst_time": answer.get_burst_time(),
+                                                             "burst_time": answer.get_burst_time(),
                                                               "priority": (answer.get_priority() if variant_name == "Priority" else None)}
                                                              for answer in generated_answers]
 
@@ -337,8 +347,8 @@ class SubmitAssessmentMutation(graphene.Mutation):
                                     str(q_process.get_name()) + " get placed in?"
 
                             processArray = [{"name": process.get_name(),
-                                            "arrival_time": process.get_arrival_time(),
-                                             "burst_time": process.get_burst_time(),
+                                             "arrival_time": process.get_arrival_time(),
+                                            "burst_time": process.get_burst_time(),
                                              "priority": (process.get_priority() if variant_name == "Priority" else None)}
                                             for process in job_queue] if variant_name in VARIANT_MAPPINGS["CPU"] else [{"name": process.get_name(),
                                                                                                                         "size": process.get_size()} for process in job_queue]

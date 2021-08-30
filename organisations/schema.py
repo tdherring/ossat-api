@@ -20,9 +20,9 @@ class CustomUserType(DjangoObjectType):
 
 class Utils:
     @staticmethod
-    def has_org_management_permission(token):
+    def has_org_creation_permission(token):
         # User has permission? (They are the user making the request or are Staff).
-        if CustomUser.objects.get(username=get_payload(token)["username"]).is_org_manager:
+        if CustomUser.objects.get(username=get_payload(token)["username"]).is_org_creator:
             return True
         return False
 
@@ -31,10 +31,13 @@ class Query():
     get_organisations = graphene.List(OrganisationType, token=graphene.String(), name=graphene.String(required=False))
 
     def resolve_get_organisations(self, info, token, name=None):
-        org_manager = Utils.has_org_management_permission(token)
         user = CustomUser.objects.get(username=get_payload(token)["username"])
-        if org_manager:
+        org_owner = Utils.has_org_creation_permission(token)
+        org_manager = Organisation.objects.filter(managers=user)
+        if org_owner:
             return Organisation.objects.filter(owner=user) if not name else Organisation.objects.get(name=name, owner=user)
+        elif len(org_manager) > 0:
+            return org_manager
         return Organisation.objects.filter(members=user)
 
 
@@ -49,12 +52,12 @@ class CreateOrganisationMutation(graphene.Mutation):
 
     @classmethod
     def mutate(cls, root, info, name, token):
-        if Utils.has_org_management_permission(token):
+        if Utils.has_org_creation_permission(token):
             if len(Organisation.objects.filter(name=name)) > 0:
                 return CreateOrganisationMutation(success=False, errors={"name": [{"message": "An Organisation with that name already exists.", "code": "org_already_exists"}]})
             elif len(name) > 200:
                 return CreateOrganisationMutation(success=False, errors={"name": [{"message": "Organisation name too long.", "code": "name_too_long"}]})
-            new_org = Organisation(name=name, invite_code="".join(random.choice(string.ascii_uppercase) for _ in range(10)), owner=CustomUser.objects.get(username=get_payload(token)["username"]))
+            new_org = Organisation(name=name, invitation_code="".join(random.choice(string.ascii_uppercase) for _ in range(10)), owner=CustomUser.objects.get(username=get_payload(token)["username"]))
             new_org.save()
             return CreateOrganisationMutation(organisation=new_org, success=True)
 
@@ -71,7 +74,7 @@ class DeleteOrganisationMutation(graphene.Mutation):
 
     @classmethod
     def mutate(cls, root, info, name, token):
-        if Utils.has_org_management_permission(token):
+        if Utils.has_org_creation_permission(token):
             if len(Organisation.objects.filter(name=name)) > 0:
                 if Organisation.objects.get(name=name).owner == CustomUser.objects.get(username=get_payload(token)["username"]):
                     Organisation.objects.get(name=name).delete()
@@ -96,7 +99,7 @@ class KickOrganisationMemberMutation(graphene.Mutation):
 
     @classmethod
     def mutate(cls, root, info, org_name, username, token):
-        if Utils.has_org_management_permission(token):
+        if Utils.has_org_creation_permission(token):
             if len(Organisation.objects.filter(name=org_name)) > 0:
                 if Organisation.objects.get(name=org_name).owner == CustomUser.objects.get(username=get_payload(token)["username"]):
                     if len(CustomUser.objects.filter(username=username)) > 0:
@@ -126,7 +129,7 @@ class PromoteOrganisationMemberMutation(graphene.Mutation):
 
     @classmethod
     def mutate(cls, root, info, org_name, username, token):
-        if Utils.has_org_management_permission(token):
+        if Utils.has_org_creation_permission(token):
             if len(Organisation.objects.filter(name=org_name)) > 0:
                 if Organisation.objects.get(name=org_name).owner == CustomUser.objects.get(username=get_payload(token)["username"]):
                     if len(CustomUser.objects.filter(username=username)) > 0:
@@ -157,7 +160,7 @@ class DemoteOrganisationManagerMutation(graphene.Mutation):
 
     @classmethod
     def mutate(cls, root, info, org_name, username, token):
-        if Utils.has_org_management_permission(token):
+        if Utils.has_org_creation_permission(token):
             if len(Organisation.objects.filter(name=org_name)) > 0:
                 if Organisation.objects.get(name=org_name).owner == CustomUser.objects.get(username=get_payload(token)["username"]):
                     if len(CustomUser.objects.filter(username=username)) > 0:
@@ -179,17 +182,17 @@ class DemoteOrganisationManagerMutation(graphene.Mutation):
 class JoinOrganisationMutation(graphene.Mutation):
     class Arguments:
         token = graphene.String()
-        invite_code = graphene.String()
+        invitation_code = graphene.String()
 
     organisation = graphene.Field(OrganisationType)
     success = graphene.Boolean()
     errors = GenericScalar()
 
     @classmethod
-    def mutate(cls, root, info, token, invite_code):
-        if not Utils.has_org_management_permission(token):
-            if len(Organisation.objects.filter(invite_code=invite_code)) > 0:
-                org = Organisation.objects.get(invite_code=invite_code)
+    def mutate(cls, root, info, token, invitation_code):
+        if not Utils.has_org_creation_permission(token):
+            if len(Organisation.objects.filter(invitation_code=invitation_code)) > 0:
+                org = Organisation.objects.get(invitation_code=invitation_code)
                 user = CustomUser.objects.get(username=get_payload(token)["username"])
                 print(user.member_of.exists())
                 if not user.member_of.exists():
@@ -198,7 +201,7 @@ class JoinOrganisationMutation(graphene.Mutation):
                 else:
                     return JoinOrganisationMutation(success=False, errors={"nonFieldErrors": [{"message": "User is already a member of an organisation.", "code": "already_member"}]})
             else:
-                return JoinOrganisationMutation(success=False, errors={"token": [{"message": "Invalid invite code.", "code": "invalid_invite_code"}]})
+                return JoinOrganisationMutation(success=False, errors={"token": [{"message": "Invalid invitation code.", "code": "invalid_invitation_code"}]})
 
         return JoinOrganisationMutation(success=False, errors={"nonFieldErrors": [{"message": "Organisation managers cannot join Organisations.", "code": "no_managers"}]})
 

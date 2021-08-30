@@ -25,7 +25,7 @@ SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", get_random_secret_key())
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ["192.168.0.3", "localhost", "ossat.io"]
 
 
 # Application definition
@@ -187,5 +187,8 @@ EMAIL_USE_SSL = False
 CORS_ORIGIN_ALLOW_ALL = False
 CORS_ORIGIN_WHITELIST = (
     'http://localhost:3000',
+    'http://192.168.0.3:3000',
+    'http://ossat.io',
+    'https://ossat.io',
 )
 CORS_ALLOW_CREDENTIALS = True
