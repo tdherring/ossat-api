@@ -20,12 +20,13 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/3.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", get_random_secret_key())
+SECRET_KEY = ''
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ["192.168.0.3", "localhost", "ossat.io"]
+# Your origins
+ALLOWED_HOSTS = []
 
 
 # Application definition
@@ -174,10 +175,12 @@ GRAPHQL_JWT = {
 }
 
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
-DEFAULT_FROM_EMAIL = 'OSSAT <noreply@ossat.io>'
-EMAIL_HOST = 'smtppro.zoho.eu'
+
+# Your SMTP settings
+DEFAULT_FROM_EMAIL = '' # Name <email>
+EMAIL_HOST = ''
 EMAIL_PORT = '587'
-EMAIL_HOST_USER = 'admin@ossat.io'
+EMAIL_HOST_USER = ''
 EMAIL_HOST_PASSWORD = os.getenv("OSSAT_EMAIL_ADMIN_PASS", "")
 EMAIL_USE_TLS = True
 EMAIL_USE_SSL = False
@@ -185,10 +188,6 @@ EMAIL_USE_SSL = False
 # Allow CORS origins
 
 CORS_ORIGIN_ALLOW_ALL = False
-CORS_ORIGIN_WHITELIST = (
-    'http://localhost:3000',
-    'http://192.168.0.3:3000',
-    'http://ossat.io',
-    'https://ossat.io',
-)
+# Your origins
+CORS_ORIGIN_WHITELIST = ()
 CORS_ALLOW_CREDENTIALS = True
