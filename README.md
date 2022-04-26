@@ -5,7 +5,7 @@
   </a>
 </p>
 
-> GraphQL API for [OSSAT](https://github.com/tdherring/ossat-frontend). 
+> Django GraphQL API for [OSSAT](https://github.com/tdherring/ossat-frontend). 
 > 
 > A Final Year Master's Project, developed for [King's College London](https://www.kcl.ac.uk/).
 
